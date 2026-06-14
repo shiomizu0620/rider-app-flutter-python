@@ -1,9 +1,5 @@
-// pubspec.yaml に追加：
-//   nfc_manager: ^3.5.0
-//   web_socket_channel: ^3.0.0
-
 import 'package:flutter/material.dart';
-import 'package:nfc_manager/nfc_manager.dart';
+import 'package:app_links/app_links.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() => runApp(MyApp());
@@ -21,48 +17,42 @@ class VentScreen extends StatefulWidget {
 }
 
 class _VentScreenState extends State<VentScreen> {
-  String status = "カードをかざしてください";
+  String status = "待機中";
   WebSocketChannel? channel;
+  final _appLinks = AppLinks();
 
-  // ★ PCのIPアドレスに変える（後述）
-  final String pcIP = "192.168.1.10";
+  final String pcIP = "172.20.10.3"; // PCのIP（テザリング時）
 
   @override
   void initState() {
     super.initState();
     connectToPC();
-    startNFC();
+    listenForNFC();
   }
 
-  // PCに接続
   void connectToPC() {
-    channel = WebSocketChannel.connect(
-      Uri.parse("ws://$pcIP:8080"),
-    );
+    try {
+      channel = WebSocketChannel.connect(Uri.parse("ws://$pcIP:8080"));
+    } catch (e) {
+      setState(() => status = "接続エラー: $e");
+    }
   }
 
-  // NFC読み取り開始
-  void startNFC() {
-    NfcManager.instance.startSession(
-      onDiscovered: (NfcTag tag) async {
-        // タグからテキストを取り出す
-        final ndef = Ndef.from(tag);
-        final records = ndef?.cachedMessage?.records;
-        if (records != null && records.isNotEmpty) {
-          final payload = records.first.payload;
-          // 先頭の言語コード分を除いてテキスト化
-          final text = String.fromCharCodes(payload.sublist(3));
-          
-          ventを発動(text);
-        }
-      },
-    );
+  void listenForNFC() {
+    // アプリ起動中にURLが来た場合
+    _appLinks.uriLinkStream.listen((uri) {
+      handleUri(uri);
+    });
+    // スリープ/終了から起動された場合
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) handleUri(uri);
+    });
   }
 
-  // 読んだIDをPCに送る
-  void ventを発動(String id) {
-    setState(() => status = "発動: $id");
-    channel?.sink.add(id);   // ★PCに送信
+  void handleUri(Uri uri) {
+    final action = uri.host.toUpperCase(); // advent → ADVENT
+    setState(() => status = "発動: $action");
+    channel?.sink.add(action);
   }
 
   @override
@@ -70,10 +60,8 @@ class _VentScreenState extends State<VentScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Text(
-          status,
-          style: TextStyle(color: Colors.amber, fontSize: 24),
-        ),
+        child: Text(status,
+            style: TextStyle(color: Colors.amber, fontSize: 28)),
       ),
     );
   }

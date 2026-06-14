@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   nfc_manager: ^4.0.2
   web_socket_channel: ^3.0.3
+  app_links: ^6.4.1
 
 dev_dependencies:
   flutter_test:
